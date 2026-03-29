@@ -1,3 +1,5 @@
+import Foundation
+import LoopKit
 import SwiftUI
 import Swinject
 
@@ -14,9 +16,17 @@ extension PumpConfig {
         @State private var decimalPlaceholder: Decimal = 0.0
         @State private var booleanPlaceholder: Bool = false
         @State var showPumpSelection: Bool = false
+        @State private var bluetoothAuthorization: BluetoothAuthorization
 
         @Environment(\.colorScheme) var colorScheme
         @Environment(AppState.self) var appState
+
+        init(resolver: Resolver, displayClose: Bool, bluetoothManager: BluetoothStateManager) {
+            self.resolver = resolver
+            self.displayClose = displayClose
+            self.bluetoothManager = bluetoothManager
+            _bluetoothAuthorization = State(initialValue: bluetoothManager.bluetoothAuthorization)
+        }
 
         var body: some View {
             NavigationView {
@@ -24,10 +34,12 @@ extension PumpConfig {
                     Section(
                         header: Text("Pump Integration to Trio"),
                         content: {
-                            if bluetoothManager.bluetoothAuthorization != .authorized {
+                            if bluetoothAuthorization != .authorized {
                                 HStack {
                                     Spacer()
-                                    BluetoothRequiredView()
+                                    BluetoothRequiredView(bluetoothManager: bluetoothManager) { authorization in
+                                        bluetoothAuthorization = authorization
+                                    }
                                     Spacer()
                                 }
                             } else if let pumpState = state.pumpState {
@@ -84,7 +96,16 @@ extension PumpConfig {
                     .listRowBackground(Color.chart)
                 }
                 .scrollContentBackground(.hidden).background(appState.trioBackgroundColor(for: colorScheme))
-                .onAppear(perform: configureView)
+                .onAppear {
+                    bluetoothAuthorization = bluetoothManager.bluetoothAuthorization
+                    configureView()
+                }
+                .onReceive(
+                    Foundation.NotificationCenter.default
+                        .publisher(for: UIApplication.willEnterForegroundNotification)
+                ) { _ in
+                    bluetoothAuthorization = bluetoothManager.bluetoothAuthorization
+                }
                 .navigationTitle("Insulin Pump")
                 .navigationBarTitleDisplayMode(.automatic)
                 .navigationBarItems(leading: displayClose ? Button("Close", action: state.hideModal) : nil)
