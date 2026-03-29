@@ -1,3 +1,4 @@
+import LoopKit
 import LoopKitUI
 import SwiftUI
 import Swinject
@@ -15,9 +16,17 @@ extension CGMSettings {
         @State private var decimalPlaceholder: Decimal = 0.0
         @State private var booleanPlaceholder: Bool = false
         @State var showCGMSelection: Bool = false
+        @State private var bluetoothAuthorization: BluetoothAuthorization
 
         @Environment(\.colorScheme) var colorScheme
         @Environment(AppState.self) var appState
+
+        init(resolver: Resolver, displayClose: Bool, bluetoothManager: BluetoothStateManager) {
+            self.resolver = resolver
+            self.displayClose = displayClose
+            self.bluetoothManager = bluetoothManager
+            _bluetoothAuthorization = State(initialValue: bluetoothManager.bluetoothAuthorization)
+        }
 
         var cgmSelectionButtons: some View {
             ForEach(cgmOptions, id: \.name) { option in
@@ -35,10 +44,12 @@ extension CGMSettings {
                     Section(
                         header: Text("CGM Integration to Trio"),
                         content: {
-                            if bluetoothManager.bluetoothAuthorization != .authorized {
+                            if bluetoothAuthorization != .authorized {
                                 HStack {
                                     Spacer()
-                                    BluetoothRequiredView()
+                                    BluetoothRequiredView(bluetoothManager: bluetoothManager) { authorization in
+                                        bluetoothAuthorization = authorization
+                                    }
                                     Spacer()
                                 }
                             } else {
@@ -148,7 +159,16 @@ extension CGMSettings {
                     )
                 }
                 .scrollContentBackground(.hidden).background(appState.trioBackgroundColor(for: colorScheme))
-                .onAppear(perform: configureView)
+                .onAppear {
+                    bluetoothAuthorization = bluetoothManager.bluetoothAuthorization
+                    configureView()
+                }
+                .onReceive(
+                    Foundation.NotificationCenter.default
+                        .publisher(for: UIApplication.willEnterForegroundNotification)
+                ) { _ in
+                    bluetoothAuthorization = bluetoothManager.bluetoothAuthorization
+                }
                 .navigationTitle("CGM")
                 .navigationBarTitleDisplayMode(.automatic)
                 .navigationBarItems(leading: displayClose ? Button("Close", action: state.hideModal) : nil)
