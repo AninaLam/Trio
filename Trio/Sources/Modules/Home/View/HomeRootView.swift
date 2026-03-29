@@ -912,7 +912,7 @@ extension Home {
                     if let apsManager = state.apsManager, let bluetoothManager = apsManager.bluetoothManager,
                        bluetoothManager.bluetoothAuthorization != .authorized
                     {
-                        BluetoothRequiredView()
+                        BluetoothRequiredView(bluetoothManager: bluetoothManager)
                     } else {
                         /// right panel with loop status and evBG
                         HStack {
